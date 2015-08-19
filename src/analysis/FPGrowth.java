@@ -25,14 +25,15 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 public class FPGrowth {
-	public static int WINDOWN_SIZE = 30;// ´°¿Ú´óĞ¡£¬·ÖÖÓÎªµ¥Î»
-	public static int STEP_SIZE = 5;// ²½³¤´óĞ¡£¬·ÖÖÓÎªµ¥Î»
+	public static int WINDOWN_SIZE = 60;// çª—å£å¤§å°ï¼Œåˆ†é’Ÿä¸ºå•ä½
+	public static int STEP_SIZE = 5;// æ­¥é•¿å¤§å°ï¼Œåˆ†é’Ÿä¸ºå•ä½
 	public static SimpleDateFormat DATE_TEMPLATE = new SimpleDateFormat(
 			"yyyy-MM-dd HH:mm:ss");
 	public static Stack<TreeNode> STACK = new Stack<TreeNode>();
 	public static String ROOT_LEAF_PATH = "";
 	public static HashMap<String, String> FINAL_LABEL_SET = new HashMap<String, String>();
-	private int minSup; // ×îĞ¡Ö§³Ö¶È
+	private int minSup; // æœ€å°æ”¯æŒåº¦
+	private static Map<String, Integer> countMap = new HashMap<String, Integer>();
 
 	public int getMinSup() {
 		return minSup;
@@ -44,38 +45,45 @@ public class FPGrowth {
 
 	public static void main(String[] args) throws IOException, Exception {
 		System.out.println("FP-Growth running...");
-		COMMON_PATH.DELETE_FILE("C:/Users/Administrator/Desktop/test/tree.txt");
-		COMMON_PATH.DELETE_FILE("C:/Users/Administrator/Desktop/test/R2L.txt");
+		COMMON_PATH
+				.DELETE_FILE("C:/Users/Administrator/Desktop/test/145+alert_tree.txt");
+		COMMON_PATH
+				.DELETE_FILE("C:/Users/Administrator/Desktop/test/145+alert_R2L.txt");
 		FPGrowth fptree = new FPGrowth();
 		File file = new File(
-				"C:/Users/Administrator/Desktop/×ÛºÏÈÕÖ¾·ÖÎö/alert_isp26_sys11_sorted.txt");
+				"C:/Users/Administrator/Desktop/test/alert_isp47_sys11_sorted.txt");
 		List<List<String>> transRecords = fptree.readFile(file);
 		System.out.println("transRecords.size\t" + transRecords.size());
-		fptree.setMinSup(5);// ×îĞ¡Ö§³Ö¶È
+		fptree.setMinSup(0);// æœ€å°æ”¯æŒåº¦
 		if (args != null && args.length == 1) {
 			fptree.setMinSup(Integer.valueOf(args[0]));
 			System.out.println("MinSup = " + args[0]);
 		}
 		ArrayList<TreeNode> F1 = fptree.buildF1Items(transRecords);
 		TreeNode treeroot = fptree.buildFPTree(transRecords, F1);
-
-		treeroot = pruning(treeroot, 0.1);
+		for (TreeNode children : treeroot.getChildren()) {
+			children.setCount(countMap.get(children.getName()));
+		}
+		
+		treeroot = pruning(treeroot, 0.1, 2);
 
 		printTree(treeroot, "", true,
-				"C:/Users/Administrator/Desktop/test/tree.txt");// ´òÓ¡FPTreeÊ÷
-		printTreePaths(treeroot, "C:/Users/Administrator/Desktop/test/R2L.txt");// ´òÓ¡FPTree¸ù½Úµãµ½Ò¶½ÚµãÂ·¾¶
+				"C:/Users/Administrator/Desktop/test/145+alert_tree.txt");// æ‰“å°FPTreeæ ‘
+		printTreePaths(treeroot,
+				"C:/Users/Administrator/Desktop/test/145+alert_R2L.txt");// æ‰“å°FPTreeæ ¹èŠ‚ç‚¹åˆ°å¶èŠ‚ç‚¹è·¯å¾„
 		System.out.println("Completed.");
 
 		System.exit(0);
 		System.out.println("Generating FPTree branchs details...");
-		File R2Lfile = new File("/home/dingyu/R2L.txt");
+		File R2Lfile = new File(
+				"C:/Users/Administrator/Desktop/test/145+alert_R2L.txt");
 		List<String[]> R2LList = readR2LFile(R2Lfile);
 		try {
 			BufferedWriter writer = new BufferedWriter(new FileWriter(new File(
 					COMMON_PATH.R2L_DETAILS_FOLDER_PATH + "R2LDetails_"
 							+ R2Lfile.getName().split("_")[1]), true));
 			for (String[] arr : R2LList) {
-				writer.write("¡ñ ");
+				writer.write("â— ");
 				for (String str : arr) {
 					writer.write(str + " ");
 				}
@@ -98,12 +106,13 @@ public class FPGrowth {
 
 	}
 
-	public static TreeNode pruning(TreeNode treeroot, double sup) {
+	public static TreeNode pruning(TreeNode treeroot, double sup, int count) {
 		if (treeroot != null) {
-			int rootCount = findRootCount(treeroot);
+			String rootName = findRootName(treeroot);
+			int rootCount = countMap.get(rootName);
 			if (!"root".equals(treeroot.getName())
-					&& (Double.valueOf(treeroot.getCount()) / Double
-							.valueOf(rootCount)) < sup) {
+					&& ((Double.valueOf(treeroot.getCount()) / Double
+							.valueOf(rootCount)) < sup || treeroot.getCount() < count)) {
 				TreeNode parent = treeroot.getParent();
 				if (parent == null)
 					return null;
@@ -121,19 +130,19 @@ public class FPGrowth {
 			int size = treeroot.getChildren().size();
 			for (int i = 0; i < size; i++) {
 				TreeNode node = STACK.pop();
-				pruning(node, sup);
+				pruning(node, sup, count);
 			}
 		}
 		return treeroot;
 	}
 
-	public static int findRootCount(TreeNode node) {
+	public static String findRootName(TreeNode node) {
 		if ("root".equals(node.getName()))
-			return 1;
+			return "root";
 		else if ("root".equals(node.getParent().getName()))
-			return node.getCount();
+			return node.getName();
 		else
-			return findRootCount(node.getParent());
+			return findRootName(node.getParent());
 	}
 
 	public static List<String[]> readR2LFile(File file) {
@@ -149,17 +158,17 @@ public class FPGrowth {
 				}
 			}
 		} catch (IOException e) {
-			System.out.println("¶ÁÈ¡ÎÄ¼şÊ§°Ü¡£");
+			System.out.println("è¯»å–æ–‡ä»¶å¤±è´¥ã€‚");
 			System.exit(-2);
 		}
 		return R2LList;
 	}
 
 	/**
-	 * ´òÓ¡¶à²æÊ÷¸ù½Úµãµ½Ò¶×Ó½ÚµãÂ·¾¶(ÀàËÆºóĞò±éÀú)
+	 * æ‰“å°å¤šå‰æ ‘æ ¹èŠ‚ç‚¹åˆ°å¶å­èŠ‚ç‚¹è·¯å¾„(ç±»ä¼¼ååºéå†)
 	 * 
 	 * @param node
-	 *            Ê÷¸ù½Úµã
+	 *            æ ‘æ ¹èŠ‚ç‚¹
 	 */
 	public static void printTreePaths(TreeNode node, String saveFileName) {
 		if (node != null) {
@@ -180,7 +189,7 @@ public class FPGrowth {
 						e.printStackTrace();
 					}
 				}
-				ROOT_LEAF_PATH = "";// ³õÊ¼»¯Â·¾¶±äÁ¿
+				ROOT_LEAF_PATH = "";// åˆå§‹åŒ–è·¯å¾„å˜é‡
 				STACK.pop();
 				return;
 			}
@@ -192,25 +201,25 @@ public class FPGrowth {
 	}
 
 	/**
-	 * ´òÓ¡¶à²æÊ÷£¬²¢°Ñ´òÓ¡³öµÄÊ÷Ğ´ÈëÎÄ¼ş¡£
+	 * æ‰“å°å¤šå‰æ ‘ï¼Œå¹¶æŠŠæ‰“å°å‡ºçš„æ ‘å†™å…¥æ–‡ä»¶ã€‚
 	 * 
 	 * @param treeNode
-	 *            ¸ù½Úµã
+	 *            æ ¹èŠ‚ç‚¹
 	 * @param prefix
-	 *            ÊäÈë""
+	 *            è¾“å…¥""
 	 * @param isTail
-	 *            ÊäÈë true
+	 *            è¾“å…¥ true
 	 * @param saveFileName
-	 *            ÊäÈë±£´æÊ÷µÄÎÄ¼şÃû£¬ÎÄ¼şÔÚCOMMON_PATH.FPTREE_PATHÎÄ¼ş¼ĞÏÂ¡£
+	 *            è¾“å…¥ä¿å­˜æ ‘çš„æ–‡ä»¶åï¼Œæ–‡ä»¶åœ¨COMMON_PATH.FPTREE_PATHæ–‡ä»¶å¤¹ä¸‹ã€‚
 	 * */
 	public static void printTree(TreeNode treeNode, String prefix,
 			boolean isTail, String saveFileName) {
-		// System.out.println(prefix + (isTail ? "©¸©¤©¤ " : "©À©¤©¤ ")
+		// System.out.println(prefix + (isTail ? "â””â”€â”€ " : "â”œâ”€â”€ ")
 		// + treeNode.getName() + " :" + treeNode.getCount());
 		FileWriter FPResFile;
 		try {
 			FPResFile = new FileWriter(new File(saveFileName), true);
-			FPResFile.append(prefix + (isTail ? "©¸©¤©¤ " : "©À©¤©¤ ")
+			FPResFile.append(prefix + (isTail ? "â””â”€â”€ " : "â”œâ”€â”€ ")
 					+ treeNode.getName() + " :" + treeNode.getCount() + "\r\n");
 			FPResFile.close();
 		} catch (IOException e) {
@@ -221,18 +230,18 @@ public class FPGrowth {
 			return;
 		for (int i = 0; i < treeNode.getChildren().size() - 1; i++) {
 			printTree(treeNode.getChildren().get(i), prefix
-					+ (isTail ? "    " : "©¦   "), false, saveFileName);
+					+ (isTail ? "    " : "â”‚   "), false, saveFileName);
 		}
 		if (treeNode.getChildren().size() > 0) {
 			printTree(
 					treeNode.getChildren().get(
 							treeNode.getChildren().size() - 1), prefix
-							+ (isTail ? "    " : "©¦   "), true, saveFileName);
+							+ (isTail ? "    " : "â”‚   "), true, saveFileName);
 		}
 	}
 
 	/**
-	 * ¶ÁÈëÊÂÎñ¼ÇÂ¼
+	 * è¯»å…¥äº‹åŠ¡è®°å½•
 	 * 
 	 * @param filenames
 	 * @return
@@ -256,18 +265,18 @@ public class FPGrowth {
 				}
 			}
 		} catch (IOException e) {
-			System.out.println("¶ÁÈ¡ÊÂÎñÊı¾İ¿âÊ§°Ü¡£");
+			System.out.println("è¯»å–äº‹åŠ¡æ•°æ®åº“å¤±è´¥ã€‚");
 			System.exit(-2);
 		}
 		return records;
 	}
 
 	/**
-	 * ¶ÁÈ¡ÊÂÎñÊı¾İ¿â
+	 * è¯»å–äº‹åŠ¡æ•°æ®åº“
 	 * 
 	 * @param fileDir
-	 *            ÊÂÎñÎÄ¼şÄ¿Â¼
-	 * @return List<String> ±£´æÊÂÎñµÄÈİÆ÷
+	 *            äº‹åŠ¡æ–‡ä»¶ç›®å½•
+	 * @return List<String> ä¿å­˜äº‹åŠ¡çš„å®¹å™¨
 	 * @throws ParseException
 	 * @throws IOException
 	 */
@@ -286,7 +295,7 @@ public class FPGrowth {
 				}
 			}
 		} catch (IOException e) {
-			System.out.println("¶ÁÈ¡ÎÄ¼şÊ§°Ü¡£");
+			System.out.println("è¯»å–æ–‡ä»¶å¤±è´¥ã€‚");
 			System.exit(-2);
 		}
 
@@ -298,7 +307,7 @@ public class FPGrowth {
 		Date endDate = DATE_TEMPLATE.parse(tmpDate);
 		Calendar cal = Calendar.getInstance();
 		cal.setTime(minDate);
-		cal.add(Calendar.MINUTE, WINDOWN_SIZE);// ÉèÖÃ´°¿Ú×î´óÊ±¼ä
+		cal.add(Calendar.MINUTE, WINDOWN_SIZE);// è®¾ç½®çª—å£æœ€å¤§æ—¶é—´
 		Date maxDate = cal.getTime();
 		int curIndex = 0;
 		while (minDate.getTime() < endDate.getTime()) {
@@ -317,14 +326,21 @@ public class FPGrowth {
 
 			List<String> record = new ArrayList<String>();
 			if (tmpDataList.size() > 0) {
+				boolean containAlert = false;
+				boolean contain145 = false;
 				for (String[] item : tmpDataList) {
 					record.add(item[1]);
+					if (item[1].contains("_"))
+						containAlert = true;
+					else if (item[1].contains("|"))
+						contain145 = true;
 				}
-				records.add(record);
+				if (contain145 && containAlert)
+					records.add(record);
 			}
 
 			cal.setTime(minDate);
-			cal.add(Calendar.MINUTE, STEP_SIZE);// ´°¿Ú×î´ó×îĞ¡Ê±¼äÏÂ»¬Ò»¸ö²½³¤
+			cal.add(Calendar.MINUTE, STEP_SIZE);// çª—å£æœ€å¤§æœ€å°æ—¶é—´ä¸‹æ»‘ä¸€ä¸ªæ­¥é•¿
 			minDate = cal.getTime();
 			cal.setTime(maxDate);
 			cal.add(Calendar.MINUTE, STEP_SIZE);
@@ -335,7 +351,7 @@ public class FPGrowth {
 	}
 
 	/**
-	 * ¹¹ÔìÆµ·±1Ïî¼¯
+	 * æ„é€ é¢‘ç¹1é¡¹é›†
 	 * 
 	 * @param transRecords
 	 * @return
@@ -344,29 +360,38 @@ public class FPGrowth {
 		ArrayList<TreeNode> F1 = null;
 		if (transRecords.size() > 0) {
 			F1 = new ArrayList<TreeNode>();
-			Map<String, TreeNode> map = new HashMap<String, TreeNode>();
-			// ¼ÆËãÊÂÎñÊı¾İ¿âÖĞ¸÷ÏîµÄÖ§³Ö¶È
+			Map<String, TreeNode> headerMap = new HashMap<String, TreeNode>();
+			// è®¡ç®—äº‹åŠ¡æ•°æ®åº“ä¸­å„é¡¹çš„æ”¯æŒåº¦
 			for (List<String> record : transRecords) {
 				for (String item : record) {
-					if (!map.keySet().contains(item)) {
+					if (!headerMap.keySet().contains(item)) {
 						TreeNode node = new TreeNode(item);
 						node.setCount(1);
-						map.put(item, node);
+						headerMap.put(item, node);
 					} else {
-						map.get(item).countIncrement(1);
+						headerMap.get(item).countIncrement(1);
 					}
 				}
 			}
-			// °ÑÖ§³Ö¶È´óÓÚ£¨»òµÈÓÚ£©minSupµÄÏî¼ÓÈëµ½F1ÖĞ
-			Set<String> names = map.keySet();
+			TreeNode root = new TreeNode("root");
+			root.setCount(1);
+			headerMap.put("root", root);
+			// æŠŠæ”¯æŒåº¦å¤§äºï¼ˆæˆ–ç­‰äºï¼‰minSupçš„é¡¹åŠ å…¥åˆ°F1ä¸­
+			Set<String> names = headerMap.keySet();
 			for (String name : names) {
-				TreeNode tnode = map.get(name);
+				TreeNode tnode = headerMap.get(name);
 				// if (tnode.getCount() >= minSup) { <------------ Modify minSup
 				if (tnode.getCount() >= 0) {
 					F1.add(tnode);
 				}
 			}
 			Collections.sort(F1);
+
+			for (Entry<String, TreeNode> node : headerMap.entrySet()) {
+				countMap.put(node.getValue().getName(), node.getValue()
+						.getCount());
+			}
+
 			return F1;
 		} else {
 			return null;
@@ -374,7 +399,7 @@ public class FPGrowth {
 	}
 
 	/**
-	 * ½¨Á¢FP-Tree
+	 * å»ºç«‹FP-Tree
 	 * 
 	 * @param transRecords
 	 * @param F1
@@ -382,17 +407,17 @@ public class FPGrowth {
 	 */
 	public TreeNode buildFPTree(List<List<String>> transRecords,
 			ArrayList<TreeNode> F1) {
-		TreeNode root = new TreeNode("root"); // ´´½¨Ê÷µÄ¸ù½Úµã
+		TreeNode root = new TreeNode("root"); // åˆ›å»ºæ ‘çš„æ ¹èŠ‚ç‚¹
 		for (List<String> transRecord : transRecords) {
 			LinkedList<String> record = sortByF1(transRecord, F1);
 			TreeNode subTreeRoot = root;
 			TreeNode tmpRoot = null;
 			if (root.getChildren() != null) {
 				while (!record.isEmpty()
-						&& (tmpRoot = subTreeRoot.findChild(record.peek())) != null) {// peek»ñÈ¡Ê×ÔªËØ
+						&& (tmpRoot = subTreeRoot.findChild(record.peek())) != null) {// peekè·å–é¦–å…ƒç´ 
 					tmpRoot.countIncrement(1);
-					subTreeRoot = tmpRoot;// ²ã´Î±éÀú
-					record.poll();// pollÉ¾³ıÊ×ÔªËØ
+					subTreeRoot = tmpRoot;// å±‚æ¬¡éå†
+					record.poll();// pollåˆ é™¤é¦–å…ƒç´ 
 				}
 			}
 			addNodes(subTreeRoot, record, F1);
@@ -401,7 +426,7 @@ public class FPGrowth {
 	}
 
 	/**
-	 * °ÑÊÂÎñÊı¾İ¿âÖĞµÄÒ»Ìõ¼ÇÂ¼°´ÕÕF1£¨Æµ·±1Ïî¼¯£©ÖĞµÄË³ĞòÅÅĞò
+	 * æŠŠäº‹åŠ¡æ•°æ®åº“ä¸­çš„ä¸€æ¡è®°å½•æŒ‰ç…§F1ï¼ˆé¢‘ç¹1é¡¹é›†ï¼‰ä¸­çš„é¡ºåºæ’åº
 	 * 
 	 * @param transRecord
 	 * @param F1
@@ -411,7 +436,7 @@ public class FPGrowth {
 			ArrayList<TreeNode> F1) {
 		Map<String, Integer> map = new HashMap<String, Integer>();
 		for (String item : transRecord) {
-			// ÓÉÓÚF1ÒÑ¾­ÊÇ°´½µĞòÅÅÁĞµÄ£¬
+			// ç”±äºF1å·²ç»æ˜¯æŒ‰é™åºæ’åˆ—çš„ï¼Œ
 			for (int i = 0; i < F1.size(); i++) {
 				TreeNode tnode = F1.get(i);
 				if (tnode.getName().equals(item)) {
@@ -425,7 +450,7 @@ public class FPGrowth {
 			@Override
 			public int compare(Entry<String, Integer> arg0,
 					Entry<String, Integer> arg1) {
-				// ½µĞòÅÅÁĞ
+				// é™åºæ’åˆ—
 				return arg0.getValue() - arg1.getValue();
 			}
 		});
@@ -437,7 +462,7 @@ public class FPGrowth {
 	}
 
 	/**
-	 * °ÑÈô¸É¸ö½Úµã×÷ÎªÖ¸¶¨½ÚµãµÄºó´ú²åÈëÊ÷ÖĞ
+	 * æŠŠè‹¥å¹²ä¸ªèŠ‚ç‚¹ä½œä¸ºæŒ‡å®šèŠ‚ç‚¹çš„åä»£æ’å…¥æ ‘ä¸­
 	 * 
 	 * @param ancestor
 	 * @param record
